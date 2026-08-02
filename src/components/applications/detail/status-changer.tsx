@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,11 +18,11 @@ import type { ApplicationStatus } from "@/lib/api/types";
  * there is no reason to make the user discover that.
  */
 export function StatusChanger({
-  status,
-  onSubmit,
-  isSaving,
-  error,
-}: {
+                                status,
+                                onSubmit,
+                                isSaving,
+                                error,
+                              }: {
   status: ApplicationStatus;
   onSubmit: (next: ApplicationStatus, note: string) => Promise<unknown>;
   isSaving: boolean;
@@ -45,52 +45,52 @@ export function StatusChanger({
   };
 
   return (
-    <Panel>
-      <PanelHeader>
-        <PanelTitle>Status</PanelTitle>
-      </PanelHeader>
-      <PanelBody className="space-y-3">
-        <div>
-          <Label htmlFor="status-change">Move to</Label>
-          <div className="mt-1.5">
-            <StatusSelect
-              id="status-change"
-              aria-label="Move to status"
-              value={selected}
-              onValueChange={(value) => setSelected(value as ApplicationStatus)}
-              disabled={isSaving}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <Label htmlFor="status-change">Move to</Label>
+            <div className="mt-1.5">
+              <StatusSelect
+                  id="status-change"
+                  aria-label="Move to status"
+                  value={selected}
+                  onValueChange={(value) => setSelected(value as ApplicationStatus)}
+                  disabled={isSaving}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="status-note">Note (optional)</Label>
+            <Input
+                id="status-note"
+                className="mt-1.5"
+                value={note}
+                placeholder="Phone screen booked for Tuesday"
+                onChange={(event) => setNote(event.target.value)}
+                disabled={isSaving}
             />
           </div>
-        </div>
 
-        <div>
-          <Label htmlFor="status-note">Note (optional)</Label>
-          <Input
-            id="status-note"
-            className="mt-1.5"
-            value={note}
-            placeholder="Phone screen booked for Tuesday"
-            onChange={(event) => setNote(event.target.value)}
-            disabled={isSaving}
-          />
-        </div>
+          <Button className="w-full" onClick={submit} disabled={unchanged || isSaving}>
+            {isSaving ? "Updating…" : "Update status"}
+          </Button>
 
-        <Button className="w-full" onClick={submit} disabled={unchanged || isSaving}>
-          {isSaving ? "Updating…" : "Update status"}
-        </Button>
+          {unchanged ? (
+              <p className="text-xs text-ink-faint">
+                Already in this status. Pick a different one to record a change.
+              </p>
+          ) : null}
 
-        {unchanged ? (
-          <p className="text-xs text-ink-faint">
-            Already in this status. Pick a different one to record a change.
-          </p>
-        ) : null}
-
-        {error ? (
-          <p className="text-sm text-rose-700" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </PanelBody>
-    </Panel>
+          {error ? (
+              <p className="text-sm text-rose-700" role="alert">
+                {error}
+              </p>
+          ) : null}
+        </CardContent>
+      </Card>
   );
 }

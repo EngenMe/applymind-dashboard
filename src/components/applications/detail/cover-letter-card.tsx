@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useCoverLetter, useCoverLetterDownload, useSaveCoverLetterText } from "@/lib/hooks/use-cover-letter";
@@ -34,70 +34,70 @@ export function CoverLetterCard({ applicationId }: { applicationId: string }) {
   };
 
   return (
-    <Panel>
-      <PanelHeader>
-        <PanelTitle>Cover letter</PanelTitle>
-        <div className="flex items-center gap-2">
-          {coverLetter ? (
-            <span className="eyebrow">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+          <CardTitle>Cover letter</CardTitle>
+          <div className="flex items-center gap-2">
+            {coverLetter ? (
+                <span className="eyebrow">
               {coverLetter.kind} · saved {formatDateTime(coverLetter.updated_at)}
             </span>
-          ) : null}
-          {coverLetter?.kind === "file" ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => download.mutate()}
-              disabled={download.isPending}
-            >
-              <Download aria-hidden />
-              {download.isPending ? "Preparing…" : "Download"}
-            </Button>
-          ) : null}
-          {isText ? (
-            <Button size="sm" onClick={commit} disabled={!dirty || save.isPending}>
-              {save.isPending ? "Saving…" : "Save cover letter"}
-            </Button>
-          ) : null}
-        </div>
-      </PanelHeader>
-
-      <PanelBody>
-        {isPending ? (
-          <p className="text-sm text-ink-faint">Loading…</p>
-        ) : isError ? (
-          <p className="text-sm text-rose-700" role="alert">
-            The cover letter did not load.
-          </p>
-        ) : coverLetter?.kind === "file" ? (
-          <p className="font-mono text-sm text-ink-muted">
-            {coverLetter.original_filename}
-          </p>
-        ) : (
-          <>
-            <Textarea
-              value={draft}
-              rows={12}
-              aria-label="Cover letter text"
-              placeholder={
-                coverLetter
-                  ? "This cover letter is empty."
-                  : "Nothing was captured for this application. Paste the letter you sent."
-              }
-              onChange={(event) => {
-                setDraft(event.target.value);
-                setDirty(true);
-              }}
-              onBlur={commit}
-            />
-            {save.isError ? (
-              <p className="mt-2 text-sm text-rose-700" role="alert">
-                {save.error instanceof Error ? save.error.message : "The save failed."}
-              </p>
             ) : null}
-          </>
-        )}
-      </PanelBody>
-    </Panel>
+            {coverLetter?.kind === "file" ? (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => download.mutate()}
+                    disabled={download.isPending}
+                >
+                  <Download aria-hidden />
+                  {download.isPending ? "Preparing…" : "Download"}
+                </Button>
+            ) : null}
+            {isText ? (
+                <Button size="sm" onClick={commit} disabled={!dirty || save.isPending}>
+                  {save.isPending ? "Saving…" : "Save cover letter"}
+                </Button>
+            ) : null}
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          {isPending ? (
+              <p className="text-sm text-ink-faint">Loading…</p>
+          ) : isError ? (
+              <p className="text-sm text-rose-700" role="alert">
+                The cover letter did not load.
+              </p>
+          ) : coverLetter?.kind === "file" ? (
+              <p className="font-mono text-sm text-ink-muted">
+                {coverLetter.original_filename}
+              </p>
+          ) : (
+              <>
+                <Textarea
+                    value={draft}
+                    rows={12}
+                    aria-label="Cover letter text"
+                    placeholder={
+                      coverLetter
+                          ? "This cover letter is empty."
+                          : "Nothing was captured for this application. Paste the letter you sent."
+                    }
+                    onChange={(event) => {
+                      setDraft(event.target.value);
+                      setDirty(true);
+                    }}
+                    onBlur={commit}
+                />
+                {save.isError ? (
+                    <p className="mt-2 text-sm text-rose-700" role="alert">
+                      {save.error instanceof Error ? save.error.message : "The save failed."}
+                    </p>
+                ) : null}
+              </>
+          )}
+        </CardContent>
+      </Card>
   );
 }
