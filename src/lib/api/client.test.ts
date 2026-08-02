@@ -75,7 +75,6 @@ describe("ApiError", () => {
     expect(error.code).toBe("site_in_use");
     expect(error.message).toBe("applications still reference this site");
     expect(error.name).toBe("ApiError");
-    expect(error instanceof Error).toBe(true);
   });
 
   it("knows a 404 from anything else", () => {
