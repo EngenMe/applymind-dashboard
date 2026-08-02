@@ -151,16 +151,53 @@ export interface CoverLetter {
 
 // --- sites -----------------------------------------------------------------
 
+/**
+ * The sites handler always sends every field below. The flags stay optional
+ * here only so existing partial `Site` literals (fixtures, tests) keep
+ * compiling — read them through the helpers in `@/lib/sites/list` rather than
+ * testing them directly, so the defaulting lives in one place.
+ */
 export interface Site {
   id: string;
   name: string;
   domain: string;
   is_preconfigured?: boolean;
   is_active?: boolean;
+  /** Scraping selectors, owned by the extension. Read-only here. */
+  selectors?: unknown;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ListSitesResponse {
   sites: Site[];
+}
+
+/**
+ * Body of POST /sites. `domain` may be a bare host or a full URL — the backend
+ * normalises it to a host before storing, so what comes back can differ from
+ * what was sent.
+ */
+export interface AddSiteBody {
+  name: string;
+  domain: string;
+}
+
+// --- settings --------------------------------------------------------------
+
+/**
+ * GET and PUT /settings/profile-summary both answer with this. Settings is a
+ * single row that always exists, so "never set" arrives as a 200 with nulls
+ * rather than a 404.
+ */
+export interface ProfileSummaryResponse {
+  profile_summary: string | null;
+  updated_at: string | null;
+}
+
+/** Body of PUT /settings/profile-summary. */
+export interface UpdateProfileSummaryBody {
+  profile_summary: string;
 }
 
 // --- errors ----------------------------------------------------------------

@@ -8,9 +8,13 @@ const SECTIONS = [
   { href: "/applications", label: "Applications" },
   { href: "/cvs", label: "CVs" },
   { href: "/cover-letters", label: "Cover letters" },
+  { href: "/settings", label: "Settings" },
 ];
 
-/** The three things the ledger holds. Added here so the new pages are reachable. */
+/**
+ * The three things the ledger holds, plus what configures them. No account or
+ * sign-out link — the MVP has one user and no login.
+ */
 export function MainNav() {
   const pathname = usePathname() ?? "";
 

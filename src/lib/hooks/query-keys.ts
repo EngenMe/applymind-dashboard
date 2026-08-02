@@ -9,4 +9,5 @@ export const queryKeys = {
   cvs: ["cvs"] as const,
   sites: ["sites"] as const,
   coverLetter: (applicationId: string) => ["cover-letter", applicationId] as const,
+  profileSummary: ["settings", "profile-summary"] as const,
 };
