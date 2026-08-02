@@ -1,13 +1,14 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createTextCoverLetter,
   editTextCoverLetter,
   getCoverLetter,
   getCoverLetterDownloadLink,
 } from "@/lib/api/cover-letters";
-import type { CoverLetter } from "@/lib/api/types";
+import type { Application, CoverLetter } from "@/lib/api/types";
+import { collectEntries, summarise } from "@/lib/cover-letters/history";
 import { queryKeys } from "./query-keys";
 
 export function useCoverLetter(applicationId: string) {
@@ -28,9 +29,9 @@ export function useSaveCoverLetterText(applicationId: string, exists: boolean) {
 
   return useMutation({
     mutationFn: (bodyText: string) =>
-      exists
-        ? editTextCoverLetter(applicationId, bodyText)
-        : createTextCoverLetter(applicationId, bodyText),
+        exists
+            ? editTextCoverLetter(applicationId, bodyText)
+            : createTextCoverLetter(applicationId, bodyText),
     onSuccess: (coverLetter: CoverLetter) => {
       queryClient.setQueryData(queryKeys.coverLetter(applicationId), coverLetter);
     },
@@ -49,4 +50,40 @@ export function useCoverLetterDownload(applicationId: string) {
       window.open(link.url, "_blank", "noopener,noreferrer");
     },
   });
+}
+
+/**
+ * Same thing for a list, where the application is only known at click time. One
+ * mutation for the whole page instead of one hook per row.
+ */
+export function useCoverLetterFileDownload() {
+  return useMutation({
+    mutationFn: (applicationId: string) => getCoverLetterDownloadLink(applicationId),
+    onSuccess: (link) => {
+      window.open(link.url, "_blank", "noopener,noreferrer");
+    },
+  });
+}
+
+/**
+ * The history behind /cover-letters.
+ *
+ * Nothing lists cover letters on their own — a letter is only ever addressed as
+ * /applications/{id}/coverletter — so this asks each application in the batch
+ * for its letter and keeps the ones that have one. Each answer is cached under
+ * the same key the application detail page uses, so opening an application after
+ * browsing the history costs nothing, and a save over there shows up here.
+ */
+export function useCoverLetterHistory(applications: Application[]) {
+  const lookups = useQueries({
+    queries: applications.map((application) => ({
+      queryKey: queryKeys.coverLetter(application.id),
+      queryFn: ({ signal }: { signal: AbortSignal }) => getCoverLetter(application.id, signal),
+      staleTime: 5 * 60 * 1000,
+    })),
+  });
+
+  const entries = collectEntries(applications, lookups);
+
+  return { entries, ...summarise(lookups, entries.length) };
 }

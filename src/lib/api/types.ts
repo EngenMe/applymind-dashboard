@@ -115,6 +115,18 @@ export interface ListCVsResponse {
   cvs: CV[];
 }
 
+/**
+ * POST /cvs. `already_existed` is true when these exact bytes were already
+ * stored under this CV, in which case nothing new was written and the version
+ * returned is the one that was already there — the handler answers 200 rather
+ * than 201 for that case.
+ */
+export interface UploadCVResponse {
+  cv: CV;
+  version: CVVersion;
+  already_existed: boolean;
+}
+
 export interface DownloadLink {
   url: string;
   filename: string;
