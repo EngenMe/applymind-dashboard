@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addSite, deleteSite, listSites, toggleSite } from "@/lib/api/sites";
-import type { AddSiteBody } from "@/lib/api/types";
+import type { AddSiteBody, ListSitesResponse, Site } from "@/lib/api/types";
 import { isActive } from "@/lib/sites/list";
 import { queryKeys } from "./query-keys";
 
@@ -52,33 +52,76 @@ export function useSiteIndex() {
   };
 }
 
-/** POST /sites. Invalidates the list so the new site appears everywhere at once. */
+/**
+ * Merges a change into the cached site list without refetching.
+ *
+ * Deliberately not `invalidateQueries`: in the demo deployment, the proxy
+ * never actually writes anything, so a refetch would return the real,
+ * unchanged list and the edit would visibly revert inside the same session.
+ * Patching the cache directly is also just a smaller, cheaper update in the
+ * real deployment — the round trip already told us what changed.
+ */
+function patchSite(queryClient: ReturnType<typeof useQueryClient>, id: string, patch: Partial<Site>) {
+  queryClient.setQueryData<ListSitesResponse>(queryKeys.sites, (current) => {
+    if (!current) return current;
+    return {
+      sites: current.sites.map((site) => (site.id === id ? { ...site, ...patch } : site)),
+    };
+  });
+}
+
+/** POST /sites. Adds the new site straight into the cached list. */
 export function useAddSite() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: AddSiteBody) => addSite(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.sites }),
+    onSuccess: (created) => {
+      queryClient.setQueryData<ListSitesResponse>(queryKeys.sites, (current) => ({
+        sites: [...(current?.sites ?? []), created],
+      }));
+    },
   });
 }
 
 /**
- * PATCH /sites/{id}/toggle. Not optimistic on purpose: the endpoint flips
- * whatever it finds rather than setting a value, so the server's answer is the
- * only reliable state to render.
+ * PATCH /sites/{id}/toggle. The endpoint flips whatever it finds rather than
+ * setting a value, so — unlike a normal PUT — there's no request body telling
+ * us the new state. The toggle is computed here, from the cache's own current
+ * value, before the request is even sent; the response is only consulted for
+ * confirmation in the real deployment; the demo proxy's echo doesn't need to
+ * carry `is_active` at all, since this hook never reads it from the response.
  */
 export function useToggleSite() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => toggleSite(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.sites }),
+    onMutate: async (id) => {
+      const previous = queryClient.getQueryData<ListSitesResponse>(queryKeys.sites);
+      const current = previous?.sites.find((site) => site.id === id);
+      if (current) {
+        patchSite(queryClient, id, { is_active: !isActive(current) });
+      }
+      return { previous };
+    },
+    onError: (_error, _id, context) => {
+      // Roll back if the real backend actually rejected it (only possible
+      // outside demo mode — the demo proxy never fails a toggle).
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.sites, context.previous);
+      }
+    },
   });
 }
 
-/** DELETE /sites/{id}. Rejected for pre-configured and in-use sites — see api/sites.ts. */
+/** DELETE /sites/{id}. Removes the row from the cached list on success. */
 export function useDeleteSite() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteSite(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.sites }),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<ListSitesResponse>(queryKeys.sites, (current) => ({
+        sites: (current?.sites ?? []).filter((site) => site.id !== id),
+      }));
+    },
   });
 }

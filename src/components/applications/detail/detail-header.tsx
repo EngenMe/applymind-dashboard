@@ -1,12 +1,17 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
 import { StatusBadge } from "../status-badge";
+import { Button } from "@/components/ui/button";
 import type { Application } from "@/lib/api/types";
 import { isTerminal, pipelineProgress } from "@/lib/applications/status";
 import { formatDate, formatRelativeDays, hostOf } from "@/lib/format";
 import { effectiveDate } from "@/lib/applications/filters";
+import { useDeleteApplication } from "@/lib/hooks/use-applications";
+import { errorMessage } from "@/lib/api/errors";
 
 export function DetailHeader({
   application,
@@ -20,13 +25,17 @@ export function DetailHeader({
 
   return (
     <header className="space-y-4">
-      <Link
-        href="/applications"
-        className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink"
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-        All applications
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link
+          href="/applications"
+          className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink"
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+          All applications
+        </Link>
+
+        <DeleteApplicationControl applicationId={application.id} companyName={application.company_name} />
+      </div>
 
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
@@ -74,5 +83,75 @@ export function DetailHeader({
         />
       </div>
     </header>
+  );
+}
+
+/**
+ * Delete, guarded by a two-step inline confirm rather than a modal — there is
+ * no Dialog primitive in ui/ to build on, and a second click is enough
+ * friction for a destructive action that only affects one record.
+ *
+ * On the public demo deployment this never actually reaches the database (see
+ * DEMO_MODE in the API proxy) — the row still disappears from the list here,
+ * it just comes back on the next real page load.
+ */
+function DeleteApplicationControl({
+  applicationId,
+  companyName,
+}: {
+  applicationId: string;
+  companyName: string;
+}) {
+  const router = useRouter();
+  const deleteApplication = useDeleteApplication();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const confirm = () => {
+    setError(null);
+    deleteApplication.mutate(applicationId, {
+      onSuccess: () => router.push("/applications"),
+      onError: (cause) =>
+        setError(errorMessage(cause, "Could not delete this application. Try again.")),
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {error ? (
+        <p className="text-sm text-rose-700" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {confirming ? (
+        <>
+          <span className="text-sm text-ink-muted">Delete {companyName}?</span>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            onClick={confirm}
+            disabled={deleteApplication.isPending}
+          >
+            {deleteApplication.isPending ? "Deleting…" : "Confirm delete"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirming(false)}
+            disabled={deleteApplication.isPending}
+          >
+            Cancel
+          </Button>
+        </>
+      ) : (
+        <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(true)}>
+          <Trash2 aria-hidden />
+          Delete
+        </Button>
+      )}
+    </div>
   );
 }
