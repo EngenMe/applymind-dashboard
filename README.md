@@ -1,118 +1,136 @@
 # ApplyMind — Web Dashboard
 
-Phase 9: application list and detail views. Next.js 15 + TypeScript, Tailwind CSS v4,
-Shadcn-style primitives, React Query.
+A web dashboard for tracking job applications end to end: which CV version was
+sent where, what cover letter went with it, and where every application
+currently stands — so you're never caught off guard when a recruiter calls
+back weeks later asking "what did I actually send you?"
 
-## Setup
+**Live:** [applymind.faroukhasnaoui.tech](https://applymind.faroukhasnaoui.tech)
 
-```bash
-npm install
-cp .env.example .env.local   # fill in both values
-npm run dev                  # http://localhost:3000/applications
-```
+This is the dashboard half of ApplyMind. A companion browser extension
+silently captures applications as they're submitted on LinkedIn; this app is
+where that data is reviewed, edited, and tracked through to an outcome.
 
-```bash
-npm test          # 35 tests
-npx tsc --noEmit  # type check
-npm run build
-```
+## Features
 
-`APPLYMIND_API_BASE_URL` is the API Gateway stage URL with no trailing slash.
-`APPLYMIND_API_KEY` is the key the backend middleware expects.
+- **Application ledger** — every application in one filterable, sortable list:
+  by status, site, CV version, or date range
+- **Full detail view** — captured job data, the exact CV and cover letter
+  sent, an AI-generated match score, and a complete status-change history
+- **Status pipeline** — move an application through Saved → Applied →
+  Interviewing → Offer/Rejected, with every transition timestamped and
+  optionally annotated, building a natural audit trail as you go
+- **CV version history** — every CV you've uploaded, every version of it, and
+  a reverse lookup showing exactly which applications each version was sent to
+- **Cover letter management** — inline editing for text letters; file-based
+  letters are preserved read-only, since the whole point is keeping an
+  unaltered record of what was actually sent
+- **Settings** — the profile summary that drives AI job-match scoring, plus
+  management of which job sites are tracked
+- **Light and dark mode**, matching system preference by default
 
-## How it is wired
+## Tech stack
+
+- **Next.js 15** (App Router) + **TypeScript**
+- **Tailwind CSS v4** with a small custom design-token system (no default
+  Tailwind palette — a deliberate, cohesive visual language instead)
+- **shadcn/ui** primitives, adapted to the token system above
+- **TanStack Query** for all server state
+- **Vitest** + **React Testing Library** for unit and component tests
+- Deployed on **Vercel**, backed by a **Go / AWS Lambda** API (see the
+  companion backend repository)
+
+## Architecture
+
+The browser never talks to the API directly:
 
 ```
 browser ──► /api/backend/*  ──►  API Gateway ──► Lambda
-            (Next route handler,
-             attaches the API key)
+            (Next.js route handler,
+             attaches the API key server-side)
 ```
 
-React Query runs in the browser, so calling the API directly would mean putting the
-key in a `NEXT_PUBLIC_` variable — which ships it to anyone who loads the page. The
-proxy at `src/app/api/backend/[...path]/route.ts` keeps it server-side. It forwards
-method, query string, body and status untouched, so the typed client in
-`src/lib/api/` still speaks to the real routes.
+The backend is protected by a static API key. If the browser called it
+directly, that key would have to live in a `NEXT_PUBLIC_*` variable — shipped
+to every visitor's browser. Instead, a Next.js route handler at
+`src/app/api/backend/[...path]/route.ts` proxies every request, attaching the
+key server-side where it's never exposed. The typed API client in `src/lib/api/`
+talks to this proxy as if it were the real API — method, query string, body,
+and status all pass through untouched.
 
-Set `NEXT_PUBLIC_API_PROXY_PATH` only if you mount the proxy somewhere else.
+### A note on authentication
 
-## Layout
+This is a deliberately single-user, personal tool — there is no login screen,
+by design. The API key above is what stands between the backend and the
+public internet; the dashboard itself trusts whoever can reach it. That's the
+right tradeoff for a personal job-search tracker, and a clearly signposted
+scope boundary rather than an oversight — a multi-user version would need a
+proper auth layer in front of this.
+
+## Getting started
+
+```bash
+npm install          # or: bun install
+cp .env.example .env.local
+npm run dev           # or: bun run dev — http://localhost:3000/applications
+```
+
+Two environment variables are required in `.env.local`:
+
+| Variable | Purpose |
+|---|---|
+| `APPLYMIND_API_BASE_URL` | The backend's base URL, no trailing slash |
+| `APPLYMIND_API_KEY` | The key the backend's auth middleware expects |
+
+```bash
+npm test           # unit and component tests
+npx tsc --noEmit   # type check
+npm run build      # production build
+```
+
+## Project structure
 
 ```
 src/
   app/
-    api/backend/[...path]/route.ts   proxy, adds the API key
-    applications/page.tsx            list route
-    applications/applications-view.tsx
-    applications/[id]/page.tsx       detail route
-    applications/[id]/application-detail-view.tsx
-    globals.css                      design tokens
+    api/backend/[...path]/route.ts   API proxy — attaches the key server-side
+    applications/                    application list + detail routes
+    cvs/                             CV manager
+    cover-letters/                   cover letter manager
+    settings/                        profile summary + tracked sites
+    globals.css                      design tokens (light + dark)
   components/
-    ui/                              button, input, select, table, panel, …
-    applications/                    filters bar, table, status badge/select
-    applications/detail/             the detail panels
+    ui/                              shadcn-derived primitives
+    applications/                    filters, table, status badge/select
+    applications/detail/             the detail-page panels
+    cvs/                             CV upload + version history
+    settings/                        settings page cards
+    theme-toggle.tsx                 light/dark switch
   lib/
-    api/                             typed client, one file per backend module
-    hooks/                           React Query hooks
-    applications/filters.ts          filter + sort logic (pure, unit tested)
-    applications/status.ts           status presentation rules
-    applications/edit.ts             PUT body merge helper
+    api/                             typed client, one module per backend resource
+    hooks/                           TanStack Query hooks
+    applications/                    filter, sort and edit-merge logic (unit tested)
+    settings/, sites/                pure logic backing the settings page (unit tested)
 ```
 
-## Decisions worth knowing about
+## Engineering notes worth highlighting
 
-**Filtering is server-side, sorting is client-side.** `GET /applications` accepts
-`status`, `site_id`, `cv_version_id`, `q`, `from`, `to`, `limit`, `offset` but has no
-sort parameter and returns no total count. So the backend narrows the set and the
-browser orders it. "Load more" raises `limit` rather than walking `offset`, which
-keeps the sort coherent across what is on screen.
+- **`PUT /applications/{id}` replaces the entire captured-data block** — there
+  is no partial-update endpoint. Every edit is merged onto the current record
+  before it's sent (`toUpdateBody`), so editing the job description can never
+  accidentally blank the company name.
+- **Status changes are append-only and fully audited.** Every transition goes
+  through its own endpoint and writes a permanent history row; the UI
+  disables the update button on a no-op transition rather than letting the
+  user discover that from a server error.
+- **CV version labels are derived, not stored** — the backend has no version
+  number, so the dashboard computes "v3" by ordering each group's uploads by
+  timestamp.
+- **The whole app runs on one design-token system.** Every color is a named
+  token (`ink`, `paper`, `graphite`, `rule`, …) rather than a hardcoded value,
+  which is what makes dark mode a CSS-only change — no component needed to
+  know a theme exists.
 
-**`PUT /applications/{id}` replaces the whole captured-data block.** Every partial
-edit is merged onto the current record by `toUpdateBody` before it is sent, so
-editing the job description cannot blank the company name.
+## License
 
-**Status changes only go through `PATCH .../status`,** so every transition gets its
-audit row. The button stays disabled while the selection matches the current status —
-the backend answers 409 `status_unchanged` for a no-op, and there is no reason to
-make the user discover that.
-
-**Cover letters:** POST when none exists, PUT to edit an existing text one. File
-cover letters are not editable — the backend answers 409 `not_editable`, because the
-stored bytes are the record of what was actually sent. Replacing one is an upload,
-which belongs to the Cover Letter Manager phase.
-
-**CV version labels** ("Backend CV — v3") are derived in the browser by ordering each
-group's versions by `uploaded_at`. The backend has no version number.
-
-## Open questions
-
-**Notes.** The phase asks for a free-text notes section saved on blur. There is
-nowhere to put it: `applications` has no notes column in the ERD and no endpoint
-accepts one. The only note the backend stores against an application is
-`application_status_history.note`, which is attached to a transition. So the Notes
-panel is read-only and replays those notes, and the note input lives in the Status
-panel where the backend actually accepts it. Adding `applications.notes` plus a PUT
-turns this into the editable textarea the phase describes — see the comment at the
-top of `notes-card.tsx`.
-
-**Follow-up due date column.** Not returned by `GET /applications`. Only `POST`
-returns `follow_up_due_at`, and `GET /notifications/due` covers reminders already
-due rather than ones due in three days — its handler was not attached to this phase,
-so its wire format is unknown here too. The column is left out rather than guessed.
-Adding `follow_up_due_at` to the list response is the smallest fix.
-
-## Assumptions
-
-- **`GET /sites` exists** and wraps rows in a `sites` key, matching how `cvs` wraps
-  `cvs`. Its handler was not attached. The query does not retry and every consumer
-  falls back to the job URL's host, so a wrong guess costs a column, not the page.
-- **`applied_at` is not editable** — `applications.UpdateInput` does not accept it,
-  so the detail page shows it read-only.
-- The proxy sends the key as both `Authorization: Bearer` and `x-api-key`, since the
-  middleware was not attached either.
-
-## Out of scope, as specified
-
-CV Manager, Cover Letter Manager, Settings, stats, export, auth UI. Deleting an
-application is in the typed client but has no UI — it is in neither the scope nor
-the out-of-scope list.
+MIT — see [LICENSE](./LICENSE).
