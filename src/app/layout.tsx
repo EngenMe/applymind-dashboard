@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import { MainNav } from "@/components/main-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 import "./globals.css";
 
 const interTight = Inter_Tight({
@@ -24,21 +25,28 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-      <html lang="en" className={`${interTight.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="en"
+      className={`${interTight.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="min-h-screen">
-      <Providers>
-        <div className="mx-auto flex min-h-screen max-w-[88rem] flex-col px-4 sm:px-6">
-          <header className="flex items-center justify-between border-b border-rule py-4">
-            <Link href="/applications" className="flex items-baseline gap-2.5">
-              <span className="text-[0.9375rem] font-semibold tracking-tight">ApplyMind</span>
-              <span className="eyebrow">Application ledger</span>
-            </Link>
-            <MainNav />
-          </header>
-          <main className="flex-1 py-6">{children}</main>
-        </div>
-      </Providers>
+        <Providers>
+          <div className="mx-auto flex min-h-screen max-w-[88rem] flex-col px-4 sm:px-6">
+            <header className="flex items-center justify-between border-b border-rule py-4">
+              <Link href="/applications" className="flex items-baseline gap-2.5">
+                <span className="text-[0.9375rem] font-semibold tracking-tight">ApplyMind</span>
+                <span className="eyebrow">Application ledger</span>
+              </Link>
+              <div className="flex items-center gap-4">
+                <MainNav />
+                <ThemeToggle />
+              </div>
+            </header>
+            <main className="flex-1 py-6">{children}</main>
+          </div>
+        </Providers>
       </body>
-      </html>
+    </html>
   );
 }

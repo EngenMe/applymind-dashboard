@@ -13,7 +13,19 @@
  * Type: Inter Tight for the interface, JetBrains Mono for anything that is data
  * rather than prose — dates, hashes, ids, file names. That split is the one
  * flourish; it matches the vernacular of the thing being tracked.
+ *
+ * Dark mode keeps the same idea rather than inventing a new one: paper becomes
+ * a near-black page, surface lifts one step off it the way white cards lift off
+ * a grey page in light mode, and graphite — the interactive accent — inverts to
+ * a light neutral so it still reads as "the thing you can act on" against its
+ * background. The status ramp (sky/amber/emerald/rose) is untouched by either
+ * theme; it is not treated as chrome.
  */
+
+/* Tells Tailwind's `dark:` utilities (and next-themes) to key off a `.dark`
+   class on an ancestor, rather than the OS-level media query. next-themes
+   applies that class to <html> once the user's preference is known. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-paper: #f6f6f7;
@@ -31,6 +43,36 @@
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
 
   --radius-card: 0.375rem;
+}
+
+/*
+ * The dark palette. Same token names, so every component that already reads
+ * bg-paper / text-ink / border-rule / etc. picks this up with no changes of its
+ * own — the swap happens here, once.
+ */
+.dark {
+  --color-paper: #121214;
+  --color-surface: #1b1b1f;
+  --color-ink: #f2f2f4;
+  --color-ink-muted: #a8a8b3;
+  --color-ink-faint: #75757f;
+  --color-rule: #2a2a30;
+  --color-rule-strong: #3c3c44;
+  --color-graphite: #e8e8ec;
+  --color-graphite-hover: #d5d5db;
+  --color-highlight: #242429;
+}
+
+/*
+ * ui/button.tsx's default variant is "bg-graphite text-white" — bg-graphite
+ * inverts correctly in dark mode (see .dark above), but text-white is Tailwind's
+ * literal white, not a token, so it does not invert with it: white text on a
+ * now-white button. Fixed here, rather than in the shadcn-managed component
+ * file, by targeting that exact class pairing with higher specificity than the
+ * single-class utility it corrects.
+ */
+.dark .bg-graphite.text-white {
+  color: var(--color-paper);
 }
 
 @layer base {
