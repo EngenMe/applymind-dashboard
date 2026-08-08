@@ -23,8 +23,11 @@ export const siteConfig = {
    */
   demoVideoUrl: null as string | null,
 
+  extensionUrl: "",
+
   repos: {
     dashboard: "https://github.com/EngenMe/applymind-dashboard",
     backend: "https://github.com/EngenMe/applymind-backend",
+    extension: "https://github.com/EngenMe/applymind-extension",
   },
 } as const;
