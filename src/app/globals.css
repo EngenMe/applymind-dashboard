@@ -43,6 +43,11 @@
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
 
   --radius-card: 0.375rem;
+
+  /* One step below Tailwind's `sm`, for the handful of places where something
+     has to give at 375px but is perfectly comfortable at 420px — the header
+     strapline, mainly. */
+  --breakpoint-xs: 26rem;
 }
 
 /*
@@ -104,6 +109,25 @@
 }
 
 @layer components {
+  /*
+   * A row that scrolls sideways without advertising it.
+   *
+   * Used where a set of controls genuinely cannot fit a narrow screen — the
+   * section nav, the sort bar above the application cards — and where wrapping
+   * into two ragged lines reads worse than scrolling. The scrollbar itself is
+   * hidden because on a touch device it is redundant, and on a trackpad it
+   * appears only while scrolling anyway. The content is still reachable by
+   * keyboard, drag, and shift-scroll; only the visual bar is suppressed.
+   */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   /* The micro-label that heads every panel. Structural, not decorative: it names
      which part of the record you are looking at. */
   .eyebrow {
@@ -135,10 +159,10 @@
     inset: 0;
     transform: translateX(-100%);
     background-image: linear-gradient(
-      90deg,
-      transparent 0%,
-      color-mix(in srgb, var(--color-surface) 70%, transparent) 50%,
-      transparent 100%
+            90deg,
+            transparent 0%,
+            color-mix(in srgb, var(--color-surface) 70%, transparent) 50%,
+            transparent 100%
     );
     animation: shimmer-sweep 1.6s ease-in-out infinite;
   }

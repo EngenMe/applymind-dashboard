@@ -25,28 +25,47 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${interTight.variable} ${jetbrainsMono.variable}`}
-      suppressHydrationWarning
-    >
+      <html
+          lang="en"
+          className={`${interTight.variable} ${jetbrainsMono.variable}`}
+          suppressHydrationWarning
+      >
       <body className="min-h-screen">
-        <Providers>
-          <div className="mx-auto flex min-h-screen max-w-[88rem] flex-col px-4 sm:px-6">
-            <header className="flex items-center justify-between border-b border-rule py-4">
+      <Providers>
+        <div className="mx-auto flex min-h-screen max-w-[88rem] flex-col px-4 sm:px-6">
+          {/*
+             * Two rows on a phone, one on a laptop. The wordmark and the theme
+             * toggle share the top line — the toggle is small and belongs with
+             * the chrome — and the sections get a line of their own below,
+             * where they have room to scroll sideways rather than wrap into a
+             * ragged block.
+             */}
+          <header className="flex flex-col gap-3 border-b border-rule py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="flex items-center justify-between gap-3">
               <Link href="/" className="flex items-baseline gap-2.5">
                 <span className="text-[0.9375rem] font-semibold tracking-tight">ApplyMind</span>
-                <span className="eyebrow">Application ledger</span>
+                {/* The strapline is the first thing to go: it explains the
+                      product to a first-time visitor and costs a returning one
+                      nothing when it is absent. */}
+                <span className="eyebrow hidden xs:inline">Application ledger</span>
               </Link>
-              <div className="flex items-center gap-4">
-                <MainNav />
+              <div className="sm:hidden">
                 <ThemeToggle />
               </div>
-            </header>
-            <main className="flex-1 py-6">{children}</main>
-          </div>
-        </Providers>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <MainNav />
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 py-6">{children}</main>
+        </div>
+      </Providers>
       </body>
-    </html>
+      </html>
   );
 }
