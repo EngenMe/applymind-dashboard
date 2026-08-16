@@ -1,34 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+import { planRequest } from "@/lib/api/proxy-policy";
 
 /**
  * Server-side proxy to the API Gateway.
  *
- * React Query runs in the browser, so anything it calls directly would need the
- * API key in a NEXT_PUBLIC_ variable — which means shipping the key to every
- * visitor. Instead the browser calls this route on the same origin and the key
- * is attached here, where it stays on the server.
+ * It exists for the same reason it always did: the browser must never hold a
+ * credential JavaScript can read. What changed in phase 16 is which credential.
+ * There is no longer a shared key standing in for the one user — there is a
+ * session cookie belonging to a specific one, and this route's job is to carry
+ * it upstream and carry the backend's Set-Cookie back down.
+ *
+ * The cookie itself is httpOnly and never legible here or in the page. This
+ * route only moves it.
  *
  * /api/backend/applications?status=Applied  ->  {BASE}/applications?status=Applied
  */
 
 const BASE_URL = process.env.APPLYMIND_API_BASE_URL;
-const API_KEY = process.env.APPLYMIND_API_KEY;
+
+/** Must match SessionCookieName in the backend's auth handler. */
+const SESSION_COOKIE = "applymind_session";
 
 /**
- * When true, this deployment is a public demo: every mutating request is
- * answered here, synthetically, and never forwarded to the real backend. GETs
- * always pass through untouched, so browsing the seeded demo data works
- * normally — only writes are intercepted.
+ * The credential signed-out visitors read with.
  *
- * This is deliberately a whole-deployment switch, not a per-user check: there
- * is no login yet, so there is no "guest" to distinguish from "you" within a
- * single deployment. Set DEMO_MODE=true on this domain's Vercel project; leave
- * it unset (or false) on the future authenticated deployment on its own
- * domain, whenever that exists.
+ * Issue it from a demo account with read_only: true — the backend's middleware
+ * then refuses writes on it regardless of what this route forwards, so a bug
+ * here cannot turn into a stranger writing rows. APPLYMIND_API_KEY is still
+ * read as a fallback so an existing deployment keeps working after this deploy;
+ * it should be replaced with a real read-only token.
+ *
+ * Leave it unset and signed-out visitors get 401s, which is the right answer
+ * for a deployment that is nobody's demo.
+ */
+const DEMO_TOKEN = process.env.APPLYMIND_DEMO_TOKEN ?? process.env.APPLYMIND_API_KEY;
+
+/**
+ * When true, mutations from signed-out visitors are answered here, synthetically,
+ * and never forwarded.
+ *
+ * Before phase 16 this had to be a whole-deployment switch because there was no
+ * way to tell one caller from another. Now there is, so it applies only to
+ * callers with no session: signed in, every request is real, on any deployment.
  */
 const DEMO_MODE = process.env.DEMO_MODE === "true";
-
-const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 const HOP_BY_HOP = new Set([
   "connection",
@@ -39,16 +54,23 @@ const HOP_BY_HOP = new Set([
   "host",
 ]);
 
-function misconfigured(): NextResponse {
+function misconfigured(detail: string): NextResponse {
   return NextResponse.json(
-    {
-      error: {
-        code: "dashboard_misconfigured",
-        message:
-          "Set APPLYMIND_API_BASE_URL and APPLYMIND_API_KEY in .env.local, then restart the dev server.",
-      },
-    },
+    { error: { code: "dashboard_misconfigured", message: detail } },
     { status: 500 },
+  );
+}
+
+/**
+ * No session, and nothing to fall back to.
+ *
+ * Deliberately the same envelope the backend would have sent, so call sites see
+ * one shape of 401 whether the proxy or the API produced it.
+ */
+function unauthenticated(): NextResponse {
+  return NextResponse.json(
+    { error: { code: "unauthenticated", message: "Sign in to continue." } },
+    { status: 401 },
   );
 }
 
@@ -108,11 +130,22 @@ async function fakeMutation(request: NextRequest, path: string[]): Promise<Respo
 }
 
 async function proxy(request: NextRequest, path: string[]): Promise<Response> {
-  if (!BASE_URL || !API_KEY) return misconfigured();
-
-  if (DEMO_MODE && MUTATING_METHODS.has(request.method)) {
-    return fakeMutation(request, path);
+  if (!BASE_URL) {
+    return misconfigured(
+      "Set APPLYMIND_API_BASE_URL in .env.local, then restart the dev server.",
+    );
   }
+
+  const plan = planRequest({
+    signedIn: Boolean(request.cookies.get(SESSION_COOKIE)?.value),
+    isAuthRoute: path[0] === "auth",
+    method: request.method,
+    demoMode: DEMO_MODE,
+    hasDemoToken: Boolean(DEMO_TOKEN),
+  });
+
+  if (plan.action === "unauthenticated") return unauthenticated();
+  if (plan.action === "fake") return fakeMutation(request, path);
 
   const target = new URL(`${BASE_URL.replace(/\/$/, "")}/${path.join("/")}`);
   target.search = request.nextUrl.search;
@@ -121,10 +154,17 @@ async function proxy(request: NextRequest, path: string[]): Promise<Response> {
   request.headers.forEach((value, key) => {
     if (!HOP_BY_HOP.has(key.toLowerCase())) headers.set(key, value);
   });
-  headers.set("Authorization", `Bearer ${API_KEY}`);
-  // Some deployments read the key from x-api-key instead; sending both costs
-  // nothing and saves a round of debugging.
-  headers.set("x-api-key", API_KEY);
+
+  // The cookie rides along in the copy above. What must not is a bearer token
+  // on top of it: two credentials on one request leaves which identity the
+  // backend picks up to the order its middleware happens to check them in.
+  const usingDemoCredential = plan.credential === "demo";
+  if (usingDemoCredential) {
+    headers.set("Authorization", `Bearer ${DEMO_TOKEN}`);
+  } else {
+    headers.delete("Authorization");
+    headers.delete("x-api-key");
+  }
 
   const hasBody = request.method !== "GET" && request.method !== "DELETE";
 
@@ -152,8 +192,25 @@ async function proxy(request: NextRequest, path: string[]): Promise<Response> {
 
   const responseHeaders = new Headers();
   upstream.headers.forEach((value, key) => {
-    if (!HOP_BY_HOP.has(key.toLowerCase())) responseHeaders.set(key, value);
+    const name = key.toLowerCase();
+    // set-cookie is handled below. Copying it here would fold multiple cookies
+    // into one comma-joined string, which browsers do not unpick.
+    if (name !== "set-cookie" && !HOP_BY_HOP.has(name)) responseHeaders.set(key, value);
   });
+
+  /**
+   * The login and logout responses carry the session cookie, and this is the
+   * only place it can cross domains: the backend set it host-only for the API
+   * host, and re-emitting it here re-homes it on the dashboard's own origin.
+   * Drop this and sign-in returns 200 with nothing to show for it.
+   */
+  for (const cookie of upstream.headers.getSetCookie()) {
+    responseHeaders.append("set-cookie", cookie);
+  }
+
+  // Lets the client render the demo banner from what actually happened, rather
+  // than inferring it from a build-time flag it cannot see.
+  if (usingDemoCredential) responseHeaders.set("x-applymind-demo", "1");
 
   return new NextResponse(upstream.body, {
     status: upstream.status,
