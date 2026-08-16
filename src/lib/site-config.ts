@@ -26,7 +26,7 @@ export const siteConfig = {
    */
   demoVideoUrl: null as string | null,
 
-  extensionUrl: "",
+  extensionUrl: "https://chromewebstore.google.com/detail/applymind/bikcgimkdmjbplaoakdllfdegpbpchhf",
 
   repos: {
     dashboard: "https://github.com/EngenMe/applymind-dashboard",
