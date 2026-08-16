@@ -24,6 +24,7 @@ describe("decide — signed out", () => {
     expect(decide("/cvs", "", null, false)).not.toBeNull();
     expect(decide("/cover-letters", "", null, false)).not.toBeNull();
     expect(decide("/settings", "", null, false)).not.toBeNull();
+    expect(decide("/connect-extension", "", null, false)).not.toBeNull();
   });
 
   it("leaves the auth pages alone", () => {

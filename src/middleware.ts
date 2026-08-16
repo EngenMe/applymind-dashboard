@@ -34,6 +34,13 @@ const PROTECTED_PREFIXES = [
   "/cvs",
   "/cover-letters",
   "/settings",
+  // Needs a real session same as the others — issuing a token requires being
+  // signed in. Missing from this list meant a signed-out visit fell through
+  // to requireUser()'s redirect instead of middleware's, which does not
+  // preserve where the request was headed — see /auth/expire/route.ts. That
+  // silently dropped the destination and landed everyone on /applications
+  // regardless of what they'd actually clicked.
+  "/connect-extension",
 ] as const;
 
 const AUTH_PAGES = ["/login", "/register"] as const;
