@@ -119,7 +119,7 @@ export default function LandingPage() {
               {siteConfig.liveAppUrl ? (
                   <Button variant="outline" asChild>
                     <a href={siteConfig.liveAppUrl} target="_blank" rel="noopener noreferrer">
-                      Use the app
+                      Sign up
                     </a>
                   </Button>
               ) : (

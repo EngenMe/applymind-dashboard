@@ -10,10 +10,13 @@ export const siteConfig = {
   demoUrl: "/applications",
 
   /**
-   * The multi-user deployment, once it exists. Null until then; the button
-   * says so rather than pretending.
+   * The multi-user deployment. Was null while phase 16 was unbuilt — the
+   * button on the landing page said so rather than pretending it existed.
+   * Points at /register specifically, not the bare domain: someone clicking
+   * this from the showcase wants to actually get an account, not land on
+   * whatever `/` resolves to for them.
    */
-  liveAppUrl: null as string | null,
+  liveAppUrl: "https://applymind.dev/register" as string | null,
 
   /**
    * An *embeddable* video URL, not a watch page:
